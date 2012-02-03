@@ -99,7 +99,7 @@
 			add_pool/8, remove_pool/1, increment_pool_size/2, decrement_pool_size/2,
 			prepare/2,
 			execute/2, execute/3, execute/4, execute/5,
-          transaction/2, transaction/3,
+          transaction/2, transaction/3, abort/1,
 			default_timeout/0,
 			modules/0	
 		]).
@@ -538,6 +538,9 @@ transaction(PoolId, Fun, Timeout) ->
         Other ->
             Other
     end.
+
+abort(Reason) ->
+    exit({aborted, Reason}).
 
 %%--------------------------------------------------------------------
 %%% Internal functions
