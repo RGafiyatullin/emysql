@@ -22,7 +22,7 @@ run() ->
       end),
 
     Result = emysql:execute(hello_pool, <<"SELECT id from investors where username = 'slepher'">>),
-    
+    {result_packet, _, _, [],<<>>} = Result,
     Result2 = 
         emysql:transaction(
           hello_pool,
@@ -30,5 +30,5 @@ run() ->
                   emysql_conn:execute(Connection, <<"INSERT INTO investors set username = 'slepher'">>, []),
                   emysql_conn:execute(Connection, <<"SELECT LAST_INSERT_ID()">>, [])
           end),
-    
-    io:format("~n~p~n~p~n", [Result, Result2]).
+    {atomic, {result_packet, _, _, [[Val]],<<>>}} = Result2,
+    io:format("~p~n", [Val]).
