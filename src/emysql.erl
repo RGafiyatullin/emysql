@@ -99,6 +99,7 @@
 			add_pool/8, remove_pool/1, increment_pool_size/2, decrement_pool_size/2,
 			prepare/2,
 			execute/2, execute/3, execute/4, execute/5,
+          transaction/2, transaction/3,
 			default_timeout/0,
 			modules/0	
 		]).
@@ -526,6 +527,17 @@ execute(PoolId, StmtName, Args, Timeout, nonblocking) when is_atom(StmtName), is
 		Other ->
 			Other
 	end.
+
+transaction(PoolId, Fun) ->
+    transaction(PoolId, Fun, default_timeout()).
+
+transaction(PoolId, Fun, Timeout) ->
+    case emysql_conn_mgr:lock_connection(PoolId) of
+        Connection when is_record(Connection, emysql_connection) ->
+            monitor_work(Connection, Timeout, {emysql_conn, transaction, [Connection, Fun]});
+        Other ->
+            Other
+    end.
 
 %%--------------------------------------------------------------------
 %%% Internal functions
