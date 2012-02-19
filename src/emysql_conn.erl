@@ -114,14 +114,12 @@ transaction(Connection, Fun) ->
                             {aborted, {commit_error, ErrorPacket}}
                     end
             catch
-                _:Exception ->
+                throw:Reason ->
                     rollback_transaction(Connection),
-                    case Exception of
-                        {aborted, Reason} ->
-                            {aborted, Reason};
-                        _ ->
-                            exit(Exception)
-                    end
+                    {aborted, Reason};
+                Class:Exception ->
+                    rollback_transaction(Connection),
+                    erlang:raise(Class, Exception, erlang:get_stacktrace())
             end;
         #error_packet{} = ErrorPacket ->
             {aborted, {begin_error, ErrorPacket}}

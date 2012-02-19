@@ -540,7 +540,7 @@ transaction(PoolId, Fun, Timeout) ->
     end.
 
 abort(Reason) ->
-    exit({aborted, Reason}).
+    throw(Reason).
 
 %%--------------------------------------------------------------------
 %%% Internal functions
