@@ -1,6 +1,6 @@
 % Use: erlc hello.erl && erl -pa ./ebin -s hello run -s init stop -noshell
 
--module(hello).
+-module(test_transaction).
 -export([run/0]).
 
 run() ->
