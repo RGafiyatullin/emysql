@@ -126,16 +126,13 @@ transaction(Connection, Fun) ->
     end.
   
 begin_transaction(Connection) ->
-	Packet = <<?COM_QUERY, "BEGIN">>,
-	emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
+    emysql_conn:execute(Connection, <<"BEGIN">>, []).
 
 rollback_transaction(Connection) ->
-	Packet = <<?COM_QUERY, "ROLLBACK">>,
-	emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
+    emysql_conn:execute(Connection, <<"ROLLBACK">>, []).
 
 commit_transaction(Connection) ->
-    Packet = <<?COM_QUERY, "COMMIT">>,
-	emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
+    emysql_conn:execute(Connection, <<"COMMIT">>, []).
 
 open_n_connections(PoolId, N) ->
 	 %-% io:format("open ~p connections for pool ~p~n", [N, PoolId]),
