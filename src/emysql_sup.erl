@@ -25,13 +25,31 @@
 -module(emysql_sup).
 -behaviour(supervisor).
 
--export([start_link/0 ,init/1]).
+-export([start_link/0 ,init/1, spawn/1, start_emysql_conn/1]).
 
 start_link() ->
-	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-init(_) ->
+init([]) ->
 	{ok, {{one_for_one, 10, 10}, [
 		{emysql_statements, {emysql_statements, start_link, []}, permanent, 5000, worker, [emysql_statements]},
-		{emysql_conn_mgr, {emysql_conn_mgr, start_link, []}, permanent, 5000, worker, [emysql_conn_mgr]}
-	]}}.
+		{emysql_conn_mgr, {emysql_conn_mgr, start_link, []}, permanent, 5000, worker, [emysql_conn_mgr]},
+    {emysql_conn_sup, {supervisor, start_link, [{local, emysql_conn_sup}, ?MODULE, [emysql_conn_sup]]},
+     transient, infinity, supervisor, [emysql_conn]}
+	]}};
+
+init([emysql_conn_sup]) ->
+    {ok, {{simple_one_for_one, 10, 10},
+          [{undefined, {?MODULE, start_emysql_conn, []}, temporary, infinity, worker, [emysql_conn]}]
+         }}.
+
+spawn(Fun) ->
+    {ok, PId} = supervisor:start_child(emysql_conn_sup, [Fun]),
+    PId.
+
+start_emysql_conn(Fun) ->
+    Val = proc_lib:spawn_link(Fun),
+    {ok, Val}.
+    
+
+

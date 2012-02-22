@@ -540,7 +540,7 @@ transaction(PoolId, Fun, Timeout) ->
     end.
 
 abort(Reason) ->
-    exit({aborted, Reason}).
+    throw(Reason).
 
 %%--------------------------------------------------------------------
 %%% Internal functions
@@ -576,7 +576,7 @@ monitor_work(Connection, Timeout, {M,F,A}) when is_record(Connection, emysql_con
 	%% spawn a new process to do work, then monitor that process until
 	%% it either dies, returns data or times out.
 	Parent = self(),
-	Pid = spawn(
+	Pid = emysql_sup:spawn(
 		fun() ->
 			receive start ->
 				Parent ! {self(), apply(M, F, A)}
