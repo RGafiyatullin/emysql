@@ -40,7 +40,7 @@ init([]) ->
 
 init([emysql_conn_sup]) ->
     {ok, {{simple_one_for_one, 10, 10},
-          [{undefined, {?MODULE, start_emysql_conn, []}, temporary, infinity, worker, [emysql_conn]}]
+          [{undefined, {?MODULE, start_emysql_conn, []}, temporary, 5000, worker, [emysql_conn]}]
          }}.
 
 spawn(Fun) ->
