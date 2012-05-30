@@ -36,7 +36,7 @@
 -record(eof_packet, {seq_num, status, warning_count}). % extended to mySQL 4.1+ format
 -record(result_packet, {seq_num, field_list, rows, extra}).
 
--define(TIMEOUT, 8000).
+-define(TIMEOUT, 60000).
 -define(LOCK_TIMEOUT, 5000).
 -define(MAXPACKETBYTES, 50000000).
 -define(LONG_PASSWORD, 1).
