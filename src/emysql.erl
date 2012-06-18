@@ -585,8 +585,8 @@ monitor_work(Connection, Timeout, {M,F,A}) when is_record(Connection, emysql_con
 	Mref = erlang:monitor(process, Pid),
 	Pid ! start,
 	receive
-		{'DOWN', Mref, process, Pid, {_, closed}} ->
-            %-% io:format("monitor_work: ~p DOWN/closed -> renew~n", [Pid]),
+    {'DOWN', Mref, process, Pid, {_, closed}} ->
+          %-% io:format("monitor_work: ~p DOWN/closed -> renew~n", [Pid]),
 			case emysql_conn:reset_connection(emysql_conn_mgr:pools(), Connection, keep) of
 				NewConnection when is_record(NewConnection, emysql_connection) ->
 					%% re-loop, with new connection.
@@ -596,8 +596,7 @@ monitor_work(Connection, Timeout, {M,F,A}) when is_record(Connection, emysql_con
 				{error, FailedReset} -> 
 					exit({connection_down, {and_conn_reset_failed, FailedReset}})
 			end;
-	receive
-		{'DOWN', Mref, process, Pid, {failed_to_recv_packet_body, _}} ->
+    {'DOWN', Mref, process, Pid, {failed_to_recv_packet_body, _}} ->
             %-% io:format("monitor_work: ~p DOWN/closed -> renew~n", [Pid]),
 			case emysql_conn:reset_connection(emysql_conn_mgr:pools(), Connection, keep) of
 				NewConnection when is_record(NewConnection, emysql_connection) ->
