@@ -596,17 +596,6 @@ monitor_work(Connection, Timeout, {M,F,A}) when is_record(Connection, emysql_con
 				{error, FailedReset} -> 
 					exit({connection_down, {and_conn_reset_failed, FailedReset}})
 			end;
-    {'DOWN', Mref, process, Pid, {failed_to_recv_packet_body, _}} ->
-            %-% io:format("monitor_work: ~p DOWN/closed -> renew~n", [Pid]),
-			case emysql_conn:reset_connection(emysql_conn_mgr:pools(), Connection, keep) of
-				NewConnection when is_record(NewConnection, emysql_connection) ->
-					%% re-loop, with new connection.
-					[_OldConn | RestArgs] = A,
-					NewA = [NewConnection | RestArgs],
-					monitor_work(NewConnection, Timeout, {M, F, NewA});
-				{error, FailedReset} -> 
-					exit({connection_down, {and_conn_reset_failed, FailedReset}})
-			end;						
 		{'DOWN', Mref, process, Pid, Reason} ->
 			%% if the process dies, reset the connection
 			%% and re-throw the error on the current pid.
