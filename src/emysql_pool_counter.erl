@@ -106,7 +106,7 @@ handle_cast({acquire, PoolId, PId}, State) ->
     NPIds = 
         case ets:lookup(pool_usage, PoolId) of
             [{PoolId, PIds}] ->
-                case orddict:lookup(PId, PIds) of
+                case orddict:find(PId, PIds) of
                     {ok, Count} ->
                         orddict:store(PId, Count + 1, PIds);
                     error ->
@@ -122,7 +122,7 @@ handle_cast({release, PoolId, PId}, State) ->
     NPIds = 
         case ets:lookup(pool_usage, PoolId) of
             [{PoolId, PIds}] ->
-                case orddict:lookup(PId, PIds) of
+                case orddict:find(PId, PIds) of
                     {ok, 1} ->
                         orddict:erase(PId, PIds);
                     {ok, Count} ->
