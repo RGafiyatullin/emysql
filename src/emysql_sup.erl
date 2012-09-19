@@ -31,12 +31,17 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-	{ok, {{one_for_one, 10, 10}, [
-		{emysql_statements, {emysql_statements, start_link, []}, permanent, 5000, worker, [emysql_statements]},
-		{emysql_conn_mgr, {emysql_conn_mgr, start_link, []}, permanent, 5000, worker, [emysql_conn_mgr]},
-    {emysql_conn_sup, {supervisor, start_link, [{local, emysql_conn_sup}, ?MODULE, [emysql_conn_sup]]},
-     transient, infinity, supervisor, [emysql_conn]}
-	]}};
+	{ok, {{one_for_one, 10, 10},
+        [{emysql_pool_counter, {emysql_pool_counter, start_link, []},
+          permanent, 5000, worker, [emysql_pool_counter]},
+         {emysql_statements, {emysql_statements, start_link, []},
+          permanent, 5000, worker, [emysql_statements]},
+         {emysql_conn_mgr, {emysql_conn_mgr, start_link, []},
+          permanent, 5000, worker, [emysql_conn_mgr]},
+         {emysql_conn_sup, {supervisor, start_link,
+                            [{local, emysql_conn_sup}, ?MODULE, [emysql_conn_sup]]},
+          transient, infinity, supervisor, [emysql_conn]}
+        ]}};
 
 init([emysql_conn_sup]) ->
     {ok, {{simple_one_for_one, 10, 10},
