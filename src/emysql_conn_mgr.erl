@@ -83,8 +83,9 @@ wait_for_connection(PoolId)->
                     %-% io:format("~p gets a connection after waiting in queue~n", [self()]),
     				Connection
 			after lock_timeout() ->
-                %-% io:format("~p gets no connection and times out -> EXIT~n~n", [self()]),
-				exit(connection_lock_timeout)
+              %-% io:format("~p gets no connection and times out -> EXIT~n~n", [self()]),
+              Usage = emysql_pool_counter:usage(PoolId),
+              exit({connection_lock_timeout, PoolId, {used_by, Usage}})
 			end;
 		Connection ->
             %-% io:format("~p gets connection~n", [self()]),
