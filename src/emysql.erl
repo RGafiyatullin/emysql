@@ -532,12 +532,8 @@ transaction(PoolId, Fun) ->
     transaction(PoolId, Fun, default_timeout()).
 
 transaction(PoolId, Fun, Timeout) ->
-    case emysql_conn_mgr:lock_connection(PoolId) of
-        Connection when is_record(Connection, emysql_connection) ->
-            monitor_work(PoolId, Connection, Timeout, {emysql_conn, transaction, [Connection, Fun]});
-        Other ->
-            Other
-    end.
+	Connection = emysql_conn_mgr:wait_for_connection(PoolId),
+    monitor_work(PoolId, Connection, Timeout, {emysql_conn, transaction, [Connection, Fun]}).
 
 abort(Reason) ->
     throw(Reason).
