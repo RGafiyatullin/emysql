@@ -31,7 +31,6 @@
 -include("emysql.hrl").
 
 -define(PACKETSIZE, 1460).
--define(ETS_SELECT(TableID), ets:select(TableID,[{{'_','$2'},[],['$2']}])).
 
 send_and_recv_packet(Sock, Packet, SeqNum) ->
 	%-% io:format("~nsend_and_receive_packet: SEND SeqNum: ~p, Binary: ~p~n", [SeqNum, <<(size(Packet)):24/little, SeqNum:8, Packet/binary>>]),
@@ -178,18 +177,14 @@ recv_packet_header(Sock) ->
 %	end.
 
 recv_packet_body(Sock, PacketLength) ->
-	Tid = ets:new(emysql_buffer, [ordered_set, private]),
-	Bin = recv_packet_body(Sock, PacketLength, Tid, 0),
-	ets:delete(Tid),
-	Bin.
+	recv_packet_body(Sock, PacketLength, queue:new(), 0).
 
-recv_packet_body(Sock, PacketLength, Tid, Key) ->
+recv_packet_body(Sock, PacketLength, Q, Key) ->
 	if
 		PacketLength > ?PACKETSIZE ->
 			case gen_tcp:recv(Sock, ?PACKETSIZE, ?TIMEOUT) of
 				{ok, Bin} ->
-					ets:insert(Tid, {Key, Bin}),
-					recv_packet_body(Sock, PacketLength - ?PACKETSIZE, Tid, Key+1);
+					recv_packet_body(Sock, PacketLength - ?PACKETSIZE, queue:in( Bin, Q ), Key+1);
 				{error, Reason1} ->
 					exit({failed_to_recv_packet_body, Reason1})
 			end;
@@ -198,7 +193,7 @@ recv_packet_body(Sock, PacketLength, Tid, Key) ->
 				{ok, Bin} ->
 					if
 						Key == 0 -> Bin;
-						true -> iolist_to_binary(?ETS_SELECT(Tid) ++ Bin)
+						true -> iolist_to_binary( queue:to_list( Q ) )
 					end;
 				{error, Reason1} ->
 					exit({failed_to_recv_packet_body, Reason1})
@@ -206,19 +201,16 @@ recv_packet_body(Sock, PacketLength, Tid, Key) ->
 	end.
 
 recv_field_list(Sock, SeqNum) ->
-	Tid = ets:new(emysql_field_list, [ordered_set, private]),
-	Res = recv_field_list(Sock, SeqNum, Tid, 0),
-	ets:delete(Tid),
-	Res.
+	recv_field_list(Sock, SeqNum, queue:new(), 0).
 
-recv_field_list(Sock, _SeqNum, Tid, Key) ->
+recv_field_list(Sock, _SeqNum, Q, Key) ->
 	case recv_packet(Sock) of
 		#packet{seq_num = SeqNum1, data = <<?RESP_EOF, _WarningCount:16/little, _ServerStatus:16/little>>} -> % (*)!
 			%-% io:format("- eof: ~p~n", [emysql_conn:hstate(_ServerStatus)]),
-			{SeqNum1, ?ETS_SELECT(Tid)};
+			{SeqNum1, queue:to_list(Q)};
 		#packet{seq_num = SeqNum1, data = <<?RESP_EOF, _/binary>>} ->
 			%-% io:format("- eof~n", []),
-			{SeqNum1, ?ETS_SELECT(Tid)};
+			{SeqNum1, queue:to_list(Q)};
 		#packet{seq_num = SeqNum1, data = Data} ->
 			{Catalog, Rest2} = emysql_util:length_coded_string(Data),
 			{Db, Rest3} = emysql_util:length_coded_string(Rest2),
@@ -244,30 +236,25 @@ recv_field_list(Sock, _SeqNum, Tid, Key) ->
 				flags = Flags,
 				decimals = Decimals
 			},
-			ets:insert(Tid, {Key, Field}),
-			recv_field_list(Sock, SeqNum1, Tid, Key+1)
+			recv_field_list(Sock, SeqNum1, queue:in( Field, Q ), Key+1)
 	end.
 
 recv_row_data(Sock, FieldList, SeqNum) ->
-	Tid = ets:new(emysql_row_data, [ordered_set, private]),
-	Res = recv_row_data(Sock, FieldList, SeqNum, Tid, 0),
-	ets:delete(Tid),
-	Res.
+	recv_row_data(Sock, FieldList, SeqNum, queue:new(), 0).
 
-recv_row_data(Sock, FieldList, _SeqNum, Tid, Key) ->
+recv_row_data(Sock, FieldList, _SeqNum, Q, Key) ->
 	%-% io:format("~nreceive row ~p: ", [Key]),
 	case recv_packet(Sock) of
 		#packet{seq_num = SeqNum1, data = <<?RESP_EOF, _WarningCount:16/little, ServerStatus:16/little>>} ->
 			%-% io:format("- eof: ~p~n", [emysql_conn:hstate(ServerStatus)]),
-			{SeqNum1, ?ETS_SELECT(Tid), ServerStatus};
+			{SeqNum1, queue:to_list(Q), ServerStatus};
 		#packet{seq_num = SeqNum1, data = <<?RESP_EOF, _/binary>>} ->
 			%-% io:format("- eof.~n", []),
-			{SeqNum1, ?ETS_SELECT(Tid), ?SERVER_NO_STATUS};
+			{SeqNum1, queue:to_list(Q), ?SERVER_NO_STATUS};
 		#packet{seq_num = SeqNum1, data = RowData} ->
 			%-% io:format("Seq: ~p raw: ~p~n", [SeqNum1, RowData]),
 			Row = decode_row_data(RowData, FieldList, []),
-			ets:insert(Tid, {Key, Row}),
-			recv_row_data(Sock, FieldList, SeqNum1, Tid, Key+1)
+			recv_row_data(Sock, FieldList, SeqNum1, queue:in(Row, Q), Key+1)
 	end.
 
 decode_row_data(<<>>, [], Acc) ->
