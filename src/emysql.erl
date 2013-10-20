@@ -610,9 +610,9 @@ monitor_work(PoolId, Connection, Timeout, {M,F,A}) when is_record(Connection, em
 	      		%% connection and collect the normal 'DOWN'
 		      	%% message send from the child process
             %-% io:format("monitor_work: ~p got result -> demonitor ~p, unlock connection ~p, return result~n", [Pid, Mref, Connection#emysql_connection.id]),
-            erlang:demonitor(Mref, [flush]),
             emysql_pool_counter:release(PoolId, Parent),
             emysql_conn_mgr:pass_connection(Connection),
+            erlang:demonitor(Mref, [flush]),
             Result
 		after Timeout ->
 			      %% if we timeout waiting for the process to return,
