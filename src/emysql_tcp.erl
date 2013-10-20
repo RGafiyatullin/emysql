@@ -56,12 +56,11 @@ send_and_recv_packet(Sock, Packet, SeqNum) ->
 			List
 	end.
 
-response_list(_, 0) -> [];
-
-response_list(Sock, ?SERVER_MORE_RESULTS_EXIST) ->
-
-	{Response, ServerStatus} = response(Sock, recv_packet(Sock)),
-	[ Response | response_list(Sock, ServerStatus band ?SERVER_MORE_RESULTS_EXIST)].
+response_list( Sock, Status ) -> response_list( Sock, Status, queue:new() ).
+response_list( _Sock, 0, Q ) -> queue:to_list( Q );
+response_list( Sock, ?SERVER_MORE_RESULTS_EXIST, Q ) ->
+	{Response, ServerStatus} = response( Sock, recv_packet(Sock) ),
+	response_list( Sock, ServerStatus band ?SERVER_MORE_RESULTS_EXIST, queue:in( Response, Q ) ).
 
 recv_packet(Sock) ->
 	%-% io:format("~p recv_packet~n", [self()]),
