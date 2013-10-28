@@ -3,6 +3,7 @@
 %% Jacob Vorreuter <jacob.vorreuter@gmail.com>,
 %% Henning Diedrich <hd2010@eonblast.com>,
 %% Eonblast Corporation <http://www.eonblast.com>
+%% Roman Gafiyatullin <r.gafiyatullin@me.com>
 %% 
 %% Permission is  hereby  granted,  free of charge,  to any person
 %% obtaining  a copy of this software and associated documentation
