@@ -30,7 +30,6 @@
          execute/3, prepare/3, unprepare/2,
          transaction/2,
          open_connections/1, open_connection/1,
-         open_unmanaged_connection/6,
          reset_connection/3, close_connection/1,
          open_n_connections/2, hstate/1
 ]).
@@ -163,31 +162,6 @@ open_connections(Pool) ->
 		false ->
 	        %-% io:format(" done~n"),
 			Pool
-	end.
-
-open_unmanaged_connection( Host, Port, User, Password, Database, Encoding ) ->
-	case gen_tcp:connect(Host, Port, [binary, {packet, raw}, {active, false}]) of
-		{ok, Sock} ->
-			Greeting = emysql_auth:do_handshake( Sock, User, Password ),
-			Connection = #emysql_connection{
-					id = erlang:port_to_list(Sock),
-					socket = Sock,
-					version = Greeting #greeting.server_version,
-					thread_id = Greeting #greeting.thread_id,
-					caps = Greeting #greeting.caps,
-					language = Greeting #greeting.language
-				},
-			case emysql_conn:set_database( Connection, Database ) of
-				#ok_packet{} -> ok;
-				#error_packet{ msg = SetDbErr } -> exit({failed_to_set_database, SetDbErr})
-			end,
-			case emysql_conn:set_encoding( Connection, Encoding ) of
-				#ok_packet{} -> ok;
-				#error_packet{ msg = SetEncErr } -> exit({failed_to_set_encoding, SetEncErr})
-			end,
-			Connection;
-		{error, Reason} -> exit({failed_to_connect_to_database, Reason});
-		What -> exit({unknown_fail, What})
 	end.
 
 open_connection(#pool{pool_id=PoolId, host=Host, port=Port, user=User, password=Password, database=Database, encoding=Encoding}) ->
