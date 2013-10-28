@@ -31,7 +31,7 @@
 	{pool_size, pos_integer()}.
 -spec start_link( [ start_arg() ] ) -> {ok, pid()}.
 start_link( Args ) ->
-	QueueName = proplists:get_value( name, Args, emysql_query_queue_default ),
+	QueueName = proplists:get_value( name, Args, undefined ),
 	Host = proplists:get_value( host, Args, "localhost" ),
 	Port = proplists:get_value( port, Args, 3306 ),
 	Db = proplists:get_value( db, Args, <<"mysql">> ),
@@ -39,9 +39,14 @@ start_link( Args ) ->
 	Password = proplists:get_value( password, Args, <<>> ),
 	Encoding = proplists:get_value( encoding, Args, utf8 ),
 	PoolSize = proplists:get_value( pool_size, Args, 1 ),
-	gen_server:start_link(
-		{local, QueueName}, ?MODULE,
-		{ QueueName, Host, Port, Db, User, Password, Encoding, PoolSize }, []).
+	case QueueName of
+		undefined ->
+			gen_server:start_link( ?MODULE,
+				{ QueueName, Host, Port, Db, User, Password, Encoding, PoolSize }, [] );
+		Defined when is_atom(Defined) ->
+			gen_server:start_link( {local, QueueName}, ?MODULE,
+				{ QueueName, Host, Port, Db, User, Password, Encoding, PoolSize }, [])
+	end.
 
 -spec execute(
 		QueryQueueName :: query_queue_name(),

@@ -47,6 +47,10 @@ enqueue_query( WorkerPid, Query, Args, GenReplyTo ) ->
 -record(s, {
 		queue_name :: atom(),
 		queue_pid :: pid(),
+
+		sender :: pid(),
+		receiver :: pid(),
+
 		worker_idx :: non_neg_integer(),
 		host :: inet:ip_address() | inet:hostname(),
 		port :: inet:port_number(),
@@ -59,10 +63,16 @@ enqueue_query( WorkerPid, Query, Args, GenReplyTo ) ->
 	}).
 
 init({ QueueName, QueuePid, WorkerIdx, Host, Port, Db, User, Password, Encoding }) ->
-	EmyConn = emysql_conn:open_unmanaged_connection( Host, Port, User, Password, Db, Encoding ),
+	EmyConn = emysql_conn2:open( Host, Port, User, Password, Db, Encoding ),
+	{ok, Receiver} = emysql_query_queue_worker_receiver:start_link( WorkerIdx, self(), QueuePid, EmyConn ),
+	{ok, Sender} = emysql_query_queue_worker_sender:start_link( self(), Receiver, EmyConn ),
 	{ok, #s{
 			queue_name = QueueName,
 			queue_pid = QueuePid,
+
+			sender = Sender,
+			receiver = Receiver,
+			
 			worker_idx = WorkerIdx,
 			host = Host,
 			port = Port,
@@ -109,14 +119,19 @@ code_change(_OldVsn, State, _Extra) ->
 handle_cast_run_query(
 	Query, Args, GenReplyTo,
 	State = #s{
-		connection = EmyConn,
-		queue_pid = QueuePid,
-		worker_idx = WorkerIdx
+		sender = Sender
 	}
 ) ->
-	EmyResult = emysql_conn:execute( EmyConn, Query, Args ),
-	emysql_query_queue:ack_query( QueuePid, WorkerIdx ),
-	_Ignored = gen_server:reply( GenReplyTo, {ok, EmyResult} ),
+	% EmyResult = emysql_conn:execute( EmyConn, Query, Args ),
+	% emysql_query_queue:ack_query( QueuePid, WorkerIdx ),
+	% _Ignored = gen_server:reply( GenReplyTo, {ok, EmyResult} ),
+	case emysql_query:render( Query, Args ) of
+		{ok, QueryRenderedIOL} ->
+			QueryRendered = iolist_to_binary([ QueryRenderedIOL ]),
+			run_query_send( Sender, QueryRendered, GenReplyTo );
+		{error, QueryRenderError} ->
+			_Ignored = gen_server:reply( GenReplyTo, {error, QueryRenderError} )
+	end,
 	{noreply, State}.
 
-
+run_query_send( Sender, Query, GenReplyTo ) -> gen_server:cast( Sender, { query_send, Query, GenReplyTo } ).

@@ -26,7 +26,7 @@
 %% OTHER DEALINGS IN THE SOFTWARE.
 
 -module(emysql_tcp).
--export([send_and_recv_packet/3, recv_packet/1, response/2]).
+-export([send_and_recv_packet/3, send_packet/3, recv_packet/1, response/2, response_list/2]).
 
 -include("emysql.hrl").
 
@@ -35,14 +35,7 @@
 send_and_recv_packet(Sock, Packet, SeqNum) ->
 	%-% io:format("~nsend_and_receive_packet: SEND SeqNum: ~p, Binary: ~p~n", [SeqNum, <<(size(Packet)):24/little, SeqNum:8, Packet/binary>>]),
 	%-% io:format("~p send_and_recv_packet: send~n", [self()]),
-	case gen_tcp:send(Sock, <<(size(Packet)):24/little, SeqNum:8, Packet/binary>>) of
-		ok -> 
-			%-% io:format("~p send_and_recv_packet: send ok~n", [self()]),
-			ok;
-		{error, Reason} ->
-			%-% io:format("~p send_and_recv_packet: ERROR ~p -> EXIT~n", [self(), Reason]),
-			exit({failed_to_send_packet_to_server, Reason})
-	end,
+	ok = send_packet( Sock, Packet, SeqNum ),
 	%-% io:format("~p send_and_recv_packet: resonse_list~n", [self()]),
 	case response_list(Sock, ?SERVER_MORE_RESULTS_EXIST) of
 		% This is a bit murky. It's compatible with former Emysql versions
@@ -54,6 +47,12 @@ send_and_recv_packet(Sock, Packet, SeqNum) ->
 		List ->
 			%-% io:format("~p send_and_recv_packet: list~n", [self()]),
 			List
+	end.
+
+send_packet( Sock, Packet, SeqNum ) ->
+	case gen_tcp:send( Sock, <<(size(Packet)):24/little, SeqNum:8, Packet/binary>> ) of
+		ok -> ok;
+		{error, Reason} -> exit({failed_to_send_packet_to_server, Reason})
 	end.
 
 response_list( Sock, Status ) -> response_list( Sock, Status, queue:new() ).
