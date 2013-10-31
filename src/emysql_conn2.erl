@@ -61,5 +61,16 @@ execute_send( Conn = #emysql_connection{}, Query ) when is_binary( Query ) ->
 	ok = emysql_tcp:send_packet( Conn #emysql_connection.socket, Packet, 0 ).
 
 execute_receive( Conn = #emysql_connection{} ) ->
-	emysql_tcp:response_list( Conn #emysql_connection.socket, ?SERVER_MORE_RESULTS_EXIST ).
+	%% The following 'case' is borrowed from emysql_tcp.erl .
+	case emysql_tcp:response_list( Conn #emysql_connection.socket, ?SERVER_MORE_RESULTS_EXIST ) of
+		% This is a bit murky. It's compatible with former Emysql versions
+		% but sometimes returns a list, e.g. for stored procedures,
+		% since an extra OK package is sent at the end of their results.
+		[Record | []] ->
+			%-% io:format("~p send_and_recv_packet: record~n", [self()]),
+			Record;
+		List ->
+			%-% io:format("~p send_and_recv_packet: list~n", [self()]),
+			List
+	end.
 
