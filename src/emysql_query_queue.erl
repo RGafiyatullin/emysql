@@ -48,7 +48,7 @@
 	{name, query_queue_name()} |
 	{host, inet:ip_address() | inet:hostname()} |
 	{port, inet:port_number()} |
-	{db, binary()} |
+	{db, binary()} | {database, binary()} |
 	{user, binary()} |
 	{password, binary()} |
 	{encoding, utf8} |
@@ -58,7 +58,7 @@ start_link( Args ) ->
 	QueueName = proplists:get_value( name, Args, undefined ),
 	Host = proplists:get_value( host, Args, "localhost" ),
 	Port = proplists:get_value( port, Args, 3306 ),
-	Db = proplists:get_value( db, Args, <<"mysql">> ),
+	Db = proplists:get_value( db, Args, proplists:get_value( database, Args, <<"mysql">> ) ),
 	User = proplists:get_value( user, Args, <<"root">> ),
 	Password = proplists:get_value( password, Args, <<>> ),
 	Encoding = proplists:get_value( encoding, Args, utf8 ),
