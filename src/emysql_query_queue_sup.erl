@@ -31,7 +31,7 @@
 
 start_link( QueueName, QueuePid, Host, Port, Db, User, Password, Encoding ) ->
 	supervisor:start_link(
-		{local, list_to_atom(atom_to_list(QueueName) ++ "_sup")},
+		% {local, list_to_atom(atom_to_list(QueueName) ++ "_sup")},
 		?MODULE, {QueueName, QueuePid, Host, Port, Db, User, Password, Encoding} ).
 
 init( {QueueName, QueuePid, Host, Port, Db, User, Password, Encoding} ) ->
