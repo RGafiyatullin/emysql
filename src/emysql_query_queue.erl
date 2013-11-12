@@ -218,7 +218,7 @@ handle_info_worker_down( WorkerPid, Reason, State0 = #s{
 			lists:foreach(
 				fun( GenReplyTo ) ->
 					_Ignored = gen_server:reply( GenReplyTo, {error, worker_dead} )
-				end, Q),
+				end, queue:to_list(Q) ),
 			{noreply, State1}
 	end.
 
