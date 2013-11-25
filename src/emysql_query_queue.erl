@@ -118,7 +118,8 @@ ack_query( QName, WorkerIdx ) ->
 
 		workers :: array(),
 		worker_queues :: array(),
-		workers_business_queue :: [ { WorkerIdx :: non_neg_integer(), TasksInFlight :: non_neg_integer() } ]
+		workers_business_queue :: treap:treap( WorkerIdx :: non_neg_integer(), TasksInFlight :: non_neg_integer(), undefined )
+		% [ { WorkerIdx :: non_neg_integer(), TasksInFlight :: non_neg_integer() } ]
 	}).
 
 init({ QueueName, Host, Port, Db, User, Password, Encoding, PoolSize }) ->
@@ -137,7 +138,7 @@ init({ QueueName, Host, Port, Db, User, Password, Encoding, PoolSize }) ->
 
 			workers = array:new( PoolSize ),
 			worker_queues = array:new( PoolSize ),
-			workers_business_queue = []
+			workers_business_queue = treap:new()
 		},
 	State1 = lists:foldl(
 		fun( Idx, State ) ->
@@ -218,7 +219,7 @@ handle_info_worker_down( WorkerPid, Reason, State0 = #s{
 			lists:foreach(
 				fun( GenReplyTo ) ->
 					_Ignored = gen_server:reply( GenReplyTo, {error, worker_dead} )
-				end, queue:to_list(Q) ),
+				end, queue:to_list(Q)),
 			{noreply, State1}
 	end.
 
@@ -226,7 +227,7 @@ handle_info_worker_down( WorkerPid, Reason, State0 = #s{
 worker_up( Idx, WPid, State = #s{ workers = Ws0, worker_queues = Qs0, workers_business_queue = WBQ0 } ) ->
 	Ws1 = array:set( Idx, WPid, Ws0 ),
 	Qs1 = array:set( Idx, queue:new(), Qs0 ),
-	WBQ1 = [ { Idx, 0 } | WBQ0 ],
+	WBQ1 = treap:store( Idx, 0, undefined, WBQ0 ),
 	_MonRef = erlang:monitor(process, WPid),
 	State #s{ workers = Ws1, worker_queues = Qs1, workers_business_queue = WBQ1 }.
 
@@ -256,7 +257,7 @@ handle_call_run_query(
 		workers_business_queue = WBQ0
 	}
 ) ->
-	[ {WorkerIdx, TasksInFlight} | WBQ1 ] = WBQ0,
+	{ WorkerIdx, TasksInFlight, undefined, WBQ1 } = treap:extract_min( WBQ0 ),
 	
 	WorkerPid = array:get( WorkerIdx, Workers ),
 	emysql_query_queue_worker:enqueue_query( WorkerPid, Query, Args, GenReplyTo ),
@@ -270,42 +271,51 @@ handle_call_run_query(
 			workers_business_queue = WBQ2
 		}}.
 
-decrement_worker_business( WorkerIdx, WBQ ) -> 
-	decrement_worker_business( WorkerIdx, WBQ, queue:new() ).
+decrement_worker_business( WorkerIdx, WBQ0 ) ->
+	{ TasksInFlight0, undefined } = treap:fetch( WorkerIdx, WBQ0 ),
+	TasksInFlight1 = TasksInFlight0 - 1,
+	treap:decrease_priority( WorkerIdx, TasksInFlight1, WBQ0 ).
 
-decrement_worker_business( WorkerIdx, [ {WorkerIdx, Old} | WBQSoFar ], Acc ) ->
-	WBQ = (queue:to_list( Acc ) ++ WBQSoFar),
-	insert_worker_business( WorkerIdx, Old - 1, WBQ );
-decrement_worker_business( WorkerIdx, [ PeekBusiness | WBQSoFar ], Acc ) ->
-	decrement_worker_business( WorkerIdx, WBQSoFar, queue:in( PeekBusiness, Acc ) ).
+% decrement_worker_business( WorkerIdx, WBQ ) -> 
+% 	decrement_worker_business( WorkerIdx, WBQ, queue:new() ).
+
+% decrement_worker_business( WorkerIdx, [ {WorkerIdx, Old} | WBQSoFar ], Acc ) ->
+% 	WBQ = (queue:to_list( Acc ) ++ WBQSoFar),
+% 	insert_worker_business( WorkerIdx, Old - 1, WBQ );
+% decrement_worker_business( WorkerIdx, [ PeekBusiness | WBQSoFar ], Acc ) ->
+% 	decrement_worker_business( WorkerIdx, WBQSoFar, queue:in( PeekBusiness, Acc ) ).
 
 
-erase_worker_business( WorkerIdx, WBQ ) ->
-	erase_worker_business( WorkerIdx, WBQ, queue:new() ).
+erase_worker_business( WorkerIdx, WBQ ) -> treap:erase( WorkerIdx, WBQ ).
+% erase_worker_business( WorkerIdx, WBQ ) ->
+% 	erase_worker_business( WorkerIdx, WBQ, queue:new() ).
 
-erase_worker_business( WorkerIdx, [ {WorkerIdx, _} | WBQ ], Acc ) -> queue:to_list( Acc ) ++ WBQ;
-erase_worker_business( WorkerIdx, [ PeekBusiness | WBQ ], Acc ) ->
-	erase_worker_business( WorkerIdx, WBQ, queue:in( PeekBusiness, Acc ) ).
+% erase_worker_business( WorkerIdx, [ {WorkerIdx, _} | WBQ ], Acc ) -> queue:to_list( Acc ) ++ WBQ;
+% erase_worker_business( WorkerIdx, [ PeekBusiness | WBQ ], Acc ) ->
+% 	erase_worker_business( WorkerIdx, WBQ, queue:in( PeekBusiness, Acc ) ).
 
 insert_worker_business( WorkerIdx, TasksInFlight, Q ) ->
-	insert_worker_business( WorkerIdx, TasksInFlight, Q, queue:new() ).
+	treap:store( WorkerIdx, TasksInFlight, undefined, Q ).
 
-insert_worker_business( WorkerIdx, TasksInFlight, [], Acc ) ->
-	queue:to_list( queue:in( {WorkerIdx, TasksInFlight}, Acc ) );
-insert_worker_business(
-		WorkerIdx, TasksInFlight,
-		Current = [ {PeekIdx, PeekTIF} | SoFar ], Acc
-	) ->
-		case TasksInFlight < PeekTIF of
-			true ->
-				queue:to_list(
-					queue:in( {WorkerIdx, TasksInFlight}, Acc )
-					) ++ Current;
-			false ->
-				insert_worker_business(
-					WorkerIdx, TasksInFlight,
-					SoFar, queue:in( {PeekIdx, PeekTIF}, Acc ))
-		end.
+% insert_worker_business( WorkerIdx, TasksInFlight, Q ) ->
+% 	insert_worker_business( WorkerIdx, TasksInFlight, Q, queue:new() ).
+
+% insert_worker_business( WorkerIdx, TasksInFlight, [], Acc ) ->
+% 	queue:to_list( queue:in( {WorkerIdx, TasksInFlight}, Acc ) );
+% insert_worker_business(
+% 		WorkerIdx, TasksInFlight,
+% 		Current = [ {PeekIdx, PeekTIF} | SoFar ], Acc
+% 	) ->
+% 		case TasksInFlight < PeekTIF of
+% 			true ->
+% 				queue:to_list(
+% 					queue:in( {WorkerIdx, TasksInFlight}, Acc )
+% 					) ++ Current;
+% 			false ->
+% 				insert_worker_business(
+% 					WorkerIdx, TasksInFlight,
+% 					SoFar, queue:in( {PeekIdx, PeekTIF}, Acc ))
+% 		end.
 
 
 
