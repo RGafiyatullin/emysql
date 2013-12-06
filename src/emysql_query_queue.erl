@@ -162,19 +162,19 @@ handle_cast( {ack_query, WorkerIdx}, State = #s{} ) ->
 	handle_cast_ack_query( WorkerIdx, State );
 
 handle_cast(Request, State = #s{}) ->
-	error_logger:warning_report(
-			?MODULE, handle_cast,
-			{bad_cast, Request}
-		),
+	error_logger:warning_report([
+				?MODULE, handle_cast,
+				{bad_cast, Request}
+			]),
 	{noreply, State}.
 
 handle_info( {'DOWN', _MonRef, process, WorkerPid, Reason}, State = #s{} ) ->
 	handle_info_worker_down( WorkerPid, Reason, State );
 handle_info(Message, State = #s{}) ->
-	error_logger:warning_report(
-			?MODULE, handle_info,
-			{bad_info, Message}
-		),
+	error_logger:warning_report([
+				?MODULE, handle_info,
+				{bad_info, Message}
+			]),
 	{noreply, State}.
 
 terminate(_Reason, _State) ->

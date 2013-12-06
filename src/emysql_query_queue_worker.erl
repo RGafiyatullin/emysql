@@ -119,16 +119,16 @@ handle_cast( {run_query, Query, Args, GenReplyTo}, State = #s{} ) ->
 	handle_cast_run_query( Query, Args, GenReplyTo, State );
 
 handle_cast(Request, State = #s{}) ->
-	error_logger:warning_report(
-			?MODULE, handle_cast,
-			{bad_cast, Request}
-		),
+	error_logger:warning_report([
+				?MODULE, handle_cast,
+				{bad_cast, Request}
+			]),
 	{noreply, State}.
 handle_info(Message, State = #s{}) ->
-	error_logger:warning_report(
-			?MODULE, handle_info,
-			{bad_info, Message}
-		),
+	error_logger:warning_report([
+				?MODULE, handle_info,
+				{bad_info, Message}
+			]),
 	{noreply, State}.
 
 terminate(_Reason, _State) ->
