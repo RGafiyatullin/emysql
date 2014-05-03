@@ -149,7 +149,12 @@ response(Sock, #packet{seq_num = SeqNum, data = Data}=_Packet) ->
 recv_packet_header(Sock) ->
 	%-% io:format("~p recv_packet_header~n", [self()]),
 	%-% io:format("~p recv_packet_header: recv~n", [self()]),
-	case gen_tcp:recv(Sock, 4, ?TIMEOUT) of
+	F = case get(emysql_receive_timeout) of
+			inifinite -> fun() -> gen_tcp:recv(Sock, 4) end;
+			SomeValue when is_integer(SomeValue) -> fun() -> gen_tcp:recv(Sock, 4, SomeValue) end;
+			_ -> fun() -> gen_tcp:recv(Sock, 4, ?TIMEOUT) end
+		end,
+	case F() of
 		{ok, <<PacketLength:24/little-integer, SeqNum:8/integer>>} ->
 			%-% io:format("~p recv_packet_header: ok~n", [self()]),
 			{PacketLength, SeqNum};

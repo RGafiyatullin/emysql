@@ -34,7 +34,8 @@
 		handle_cast/2,
 		handle_info/2,
 		terminate/2,
-		code_change/3
+		code_change/3,
+		slave_receiver/2
 	]).
 
 -include ("emysql.hrl").
@@ -50,28 +51,49 @@ start_link( WorkerIdx, WorkerPid, QueuePid, Conn ) ->
 		worker_pid :: pid(),
 		worker_idx :: non_neg_integer(),
 		queue_pid :: pid(),
-		conn :: #emysql_connection{}
+		slave :: pid(),
+		reply_queue :: queue(),
+		request_queue :: queue()
 	}).
 
 init({ WorkerIdx, WorkerPid, QueuePid, Conn }) ->
+	Master = self(),
+	Slave = spawn_link(?MODULE, slave_receiver, [Master, Conn]),
 	{ok, #s{
 		worker_pid = WorkerPid,
 		worker_idx = WorkerIdx,
 		queue_pid = QueuePid, 
-		conn = Conn
+		slave = Slave,
+		reply_queue = queue:new(),
+		request_queue = queue:new()
 	}}.
 
 handle_call(Request, GenReplyTo, State = #s{}) ->
 	error_logger:warning_report([?MODULE, handle_call, {unexpected_call, Request}, {gen_reply_to, GenReplyTo}, {state, State}]),
 	{reply, {badarg, Request}, State}.
 
-handle_cast( {query_sent, GenReplyTo}, State = #s{} ) ->
-	handle_cast_query_sent( GenReplyTo, State );
-
+handle_cast( {query_sent, GenReplyTo}, State = #s{queue_pid = QueuePid, worker_idx = WorkerIdx, reply_queue = ReplyQueue, request_queue = RequestQueue} ) ->
+	case queue:is_empty(ReplyQueue) of
+		true ->
+			{noreply, State#s{request_queue = queue:in(GenReplyTo, RequestQueue)}};
+		false ->
+			{{value, Reply}, ReplyQueue2} = queue:out(ReplyQueue),
+			ok = do_reply(QueuePid, WorkerIdx, GenReplyTo, Reply),
+			{noreply, State#s{reply_queue = ReplyQueue2}}
+	end;
 handle_cast(Request, State = #s{}) ->
 	error_logger:warning_report([?MODULE, handle_cast, {unexpected_cast, Request}, {state, State}]),
 	{noreply, State}.
 
+handle_info({received, Reply}, State = #s{queue_pid = QueuePid, worker_idx = WorkerIdx, reply_queue = ReplyQueue, request_queue = RequestQueue}) ->
+	case queue:is_empty(RequestQueue) of
+		true ->
+			{noreply, State#s{reply_queue = queue:in(Reply, ReplyQueue)}};
+		false ->
+			{{value, Request}, RequestQueue2} = queue:out(RequestQueue),
+			ok = do_reply(QueuePid, WorkerIdx, Request, Reply),
+			{noreply, State#s{request_queue = RequestQueue2}}
+	end;
 handle_info(Message, State = #s{}) ->
 	error_logger:warning_report([?MODULE, handle_info, {unexpected_info, Message}, {state, State}]),
 	{noreply, State}.
@@ -85,8 +107,17 @@ code_change(_OldVsn, State, _Extra) ->
 %%% %%%%%%%% %%%
 %%% Internal %%%
 %%% %%%%%%%% %%%
-handle_cast_query_sent( GenReplyTo, State = #s{ queue_pid = QueuePid, worker_idx = WorkerIdx, conn = EmyConn } ) ->
-	ReplyWith = emysql_conn2:execute_receive( EmyConn ),
+
+do_reply(QueuePid, WorkerIdx, Request, Reply) ->
 	emysql_query_queue:ack_query( QueuePid, WorkerIdx ),
-	_Ignored = gen_server:reply( GenReplyTo, {ok, ReplyWith} ),
-	{noreply, State}.
+	_Ignored = gen_server:reply( Request, {ok, Reply} ),
+	ok.
+
+slave_receiver(Master, Conn) ->
+	put(emysql_receive_timeout, infinite),
+	slave_receiver_int(Master, Conn).
+
+slave_receiver_int(Master, Conn) ->
+	ReplyWith = emysql_conn2:execute_receive( Conn ),
+	Master ! {received, ReplyWith},
+	slave_receiver_int(Master, Conn).
