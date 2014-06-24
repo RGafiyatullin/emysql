@@ -29,7 +29,7 @@
 		start_link/9
 	]).
 -export([
-		init/1,
+		enter_loop/1, init/1,
 		handle_call/3,
 		handle_cast/2,
 		handle_info/2,
@@ -55,8 +55,8 @@
 		WorkerIdx :: non_neg_integer()
 	) -> {ok, pid()}.
 start_link( QueueName, QueuePid, Host, Port, Db, User, Password, Encoding, WorkerIdx ) ->
-	gen_server:start_link(
-		?MODULE, { QueueName, QueuePid, WorkerIdx, Host, Port, Db, User, Password, Encoding }, []).
+	proc_lib:start_link(
+		?MODULE, enter_loop, [{ QueueName, QueuePid, WorkerIdx, Host, Port, Db, User, Password, Encoding }] ).
 
 -spec enqueue_query(
 		WorkerPid :: pid(), Query :: binary(),
@@ -86,11 +86,13 @@ enqueue_query( WorkerPid, Query, Args, GenReplyTo ) ->
 		connection :: #emysql_connection{}
 	}).
 
-init({ QueueName, QueuePid, WorkerIdx, Host, Port, Db, User, Password, Encoding }) ->
+enter_loop({ QueueName, QueuePid, WorkerIdx, Host, Port, Db, User, Password, Encoding }) ->
+	proc_lib:init_ack({ok, self()}),
+
 	EmyConn = emysql_conn2:open( Host, Port, User, Password, Db, Encoding ),
 	{ok, Receiver} = emysql_query_queue_worker_receiver:start_link( WorkerIdx, self(), QueuePid, EmyConn ),
 	{ok, Sender} = emysql_query_queue_worker_sender:start_link( self(), Receiver, EmyConn ),
-	{ok, #s{
+	S0 = #s{
 			queue_name = QueueName,
 			queue_pid = QueuePid,
 
@@ -106,7 +108,10 @@ init({ QueueName, QueuePid, WorkerIdx, Host, Port, Db, User, Password, Encoding 
 			encoding = Encoding,
 
 			connection = EmyConn
-		}}.
+		},
+	gen_server:enter_loop( ?MODULE, [], S0 ).
+
+init( _ ) -> {error, enter_loop_used}.
 
 handle_call(Request, From, State = #s{}) ->
 	error_logger:warning_report([
