@@ -118,6 +118,10 @@ slave_receiver(Master, Conn) ->
 	slave_receiver_int(Master, Conn).
 
 slave_receiver_int(Master, Conn) ->
-	ReplyWith = emysql_conn2:execute_receive( Conn ),
-	Master ! {received, ReplyWith},
+	try
+		ReplyWith = emysql_conn2:execute_receive( Conn ),
+		Master ! {received, ReplyWith}
+	catch
+		exit:{failed_to_recv_packet_header,timeout} -> exit(shutdown)
+	end,
 	slave_receiver_int(Master, Conn).

@@ -202,12 +202,18 @@ handle_info_worker_down( WorkerPid, Reason, State0 = #s{
 				{reason, Reason} ]),
 			{noreply, State0};
 		{WorkerIdx, WorkerPid} ->
-			error_logger:warning_report([
-				?MODULE, worker_down,
-				{worker_idx, WorkerIdx},
-				{worker_pid, WorkerPid},
-				{down_reason, Reason}
-			]),
+			case Reason of
+				normal -> ok;
+				shutdown -> ok;
+				{shutdown, _} -> ok;
+				_ ->
+					error_logger:warning_report([
+						?MODULE, worker_down,
+						{worker_idx, WorkerIdx},
+						{worker_pid, WorkerPid},
+						{down_reason, Reason}
+					])
+			end,
 			{_, Q} = treap:fetch( WorkerIdx, WBQ0 ),
 			{ok, NewWorkerPid} = supervisor:start_child( Sup, [ WorkerIdx ] ),
 			State1 = 
