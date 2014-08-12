@@ -73,7 +73,7 @@ start_link( Args ) ->
 	end.
 
 -spec execute(
-		QueryQueueName :: query_queue_name(),
+		QueryQueueName :: query_queue_name() | pid(),
 		iolist() | binary(), [term()]
 	) -> term().
 execute( QueryQueueName, Query, Args ) ->

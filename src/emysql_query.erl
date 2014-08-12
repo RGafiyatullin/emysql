@@ -30,7 +30,7 @@ render( QueryIOL, Args ) ->
 	Query = iolist_to_binary( [QueryIOL] ),
 	render( Query, queue:new(), Args ).
 
--spec render( QuerySoFar :: binary(), QueryRendered :: queue(), Args :: [term()] ) -> {ok, RenderedQuery :: iolist()}.
+-spec render( QuerySoFar :: binary(), QueryRendered :: queue:queue( term() ), Args :: [term()] ) -> {ok, RenderedQuery :: iolist()}.
 render( <<>>, _QueryRendered, [ _ | _ ] ) -> {error, too_many_args};
 render( QuerySoFar, QueryRendered, [] ) -> {ok, [ queue:to_list( QueryRendered ), QuerySoFar ]};
 render( << $?/utf8, QuerySoFar/binary >>, QueryRendered, [ Arg | Args ] ) ->

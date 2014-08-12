@@ -52,8 +52,8 @@ start_link( WorkerIdx, WorkerPid, QueuePid, Conn ) ->
 		worker_idx :: non_neg_integer(),
 		queue_pid :: pid(),
 		slave :: pid(),
-		reply_queue :: queue(),
-		request_queue :: queue()
+		reply_queue :: queue:queue(term()),
+		request_queue :: queue:queue(term())
 	}).
 
 init({ WorkerIdx, WorkerPid, QueuePid, Conn }) ->
