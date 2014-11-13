@@ -10,10 +10,38 @@
 		modify/4,
 		modify_shard/4
 	]).
+-export ([
+		shard_mgr_enter_loop/2
+	]).
 -include ("emysql.hrl").
 -define(is_emy( Emy ), ( is_atom( Emy ) orelse is_pid( Emy ) )).
 
-start_link( Args ) ->
+
+start_link( {url, BinUrl} ) when is_binary( BinUrl ) ->
+	?MODULE:start_link( {url, binary_to_list( BinUrl )} );
+start_link( {url, Url} ) when is_list(Url) ->
+	{ok, {mysql, UserPassword, Host, Port, [ $/ | Database ], MaybeQueryString}} =
+		http_uri:parse(Url, [{scheme_defaults, [{mysql, 3306}]}]),
+	QueryString =
+		case MaybeQueryString of
+			[ $? | QS ] -> QS;
+			[] -> []
+		end,
+	ArgsParsed =
+		[ begin [K, V] = string:tokens( KV, "=" ), {K, V} end
+			|| KV <- string:tokens( QueryString, "&" ) ],
+	PoolSize = list_to_integer( proplists:get_value( "pool_size", ArgsParsed, "1" ) ),
+	[User, Password] = string:tokens( UserPassword, ":" ),
+	ArgsPropList = [
+			{user, User},
+			{password, Password},
+			{host, Host},
+			{port, Port},
+			{db, Database},
+			{pool_size, PoolSize}
+		],
+	?MODULE:start_link( ArgsPropList );
+start_link( Args ) when is_list( Args ) ->
 	emysql_query_queue:start_link( Args ).
 
 select( Emy, Q, A ) when ?is_emy(Emy) ->
@@ -58,8 +86,8 @@ shard_mgr_enter_loop( RegName, ShardArgs ) ->
 		ShardArgs
 	),
 	ok = lists:foreach(
-		fun ( {ShardIdx, ShardArgs} ) ->
-			{ok, Emy} = ?MODULE:start_link( ShardArgs ),
+		fun ( {ShardIdx, Args} ) ->
+			{ok, Emy} = ?MODULE:start_link( Args ),
 			true = ets:insert_new( RegName, {ShardIdx, Emy} )
 		end,
 		ShardArgsWithIdx),
