@@ -66,7 +66,7 @@ shards_count( RegName ) ->
 	SC.
 
 select( RegName, SK, Q, A ) when is_atom( RegName ) ->
-	SC = ?MODULE:shards_count(),
+	SC = ?MODULE:shards_count( RegName ),
 	?MODULE:select_shard( RegName, erlang:phash2( SK, SC ), Q, A ).
 
 select_shard( RegName, SIdx, Q, A ) when is_atom( RegName ) andalso is_integer( SIdx ) ->
@@ -74,7 +74,7 @@ select_shard( RegName, SIdx, Q, A ) when is_atom( RegName ) andalso is_integer( 
 	?MODULE:select( Emy, Q, A ).
 
 modify( RegName, SK, Q, A ) when is_atom( RegName ) ->
-	SC = ?MODULE:shards_count(),
+	SC = ?MODULE:shards_count( RegName ),
 	?MODULE:modify_shard( RegName, erlang:phash2( SK, SC ), Q, A ).
 
 modify_shard( RegName, SIdx, Q, A ) when is_atom( RegName ) andalso is_integer( SIdx ) ->
