@@ -5,6 +5,7 @@
 		modify/3,
 
 		start_link_shards/2,
+		shards_count/1,
 		select/4,
 		select_shard/4,
 		modify/4,
@@ -60,9 +61,12 @@ modify( Emy, Q, A ) when ?is_emy( Emy ) ->
 start_link_shards( RegName, ShardArgs ) ->
 	proc_lib:start_link( ?MODULE, shard_mgr_enter_loop, [ RegName, ShardArgs ] ).
 
+shards_count( RegName ) ->
+	[{shards_count, SC}] = ets:lookup( RegName, shards_count ),
+	SC.
 
 select( RegName, SK, Q, A ) when is_atom( RegName ) ->
-	[{shards_count, SC}] = ets:lookup( RegName, shards_count ),
+	SC = ?MODULE:shards_count(),
 	?MODULE:select_shard( RegName, erlang:phash2( SK, SC ), Q, A ).
 
 select_shard( RegName, SIdx, Q, A ) when is_atom( RegName ) andalso is_integer( SIdx ) ->
@@ -70,7 +74,7 @@ select_shard( RegName, SIdx, Q, A ) when is_atom( RegName ) andalso is_integer( 
 	?MODULE:select( Emy, Q, A ).
 
 modify( RegName, SK, Q, A ) when is_atom( RegName ) ->
-	[{shards_count, SC}] = ets:lookup( RegName, shards_count ),
+	SC = ?MODULE:shards_count(),
 	?MODULE:modify_shard( RegName, erlang:phash2( SK, SC ), Q, A ).
 
 modify_shard( RegName, SIdx, Q, A ) when is_atom( RegName ) andalso is_integer( SIdx ) ->
